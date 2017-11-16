@@ -1,0 +1,56 @@
+
+.modal-header {
+    padding: 2px 16px;
+    background-color: #D8BFD8;
+    color: black;
+    text-align: center;
+
+}
+.modal-title{
+    font-size: 30px;
+    text-transform: uppercase;
+}
+.modal-body {
+    padding: 2px 16px;
+}
+.close{
+
+top:20px;
+left:50px;
+margin:0px;
+padding:0px;
+margin-left: 489px;
+        }
+}
+
+.modal-footer {
+    padding: 2px 16px;
+    background-color: #D8BFD8;
+    color: white;
+}
+
+/* Modal Content */
+.modal-content {
+    position: relative;
+    background-color: #fefefe;
+    margin: auto;
+    padding: 0;
+    border: 1px solid #888;
+    width: 80%;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: 0.4s;
+    animation-name: animatetop;
+    animation-duration: 0.4s
+}
+
+/* Add Animation */
+@-webkit-keyframes animatetop {
+    from {top: -300px; opacity: 0}
+    to {top: 0; opacity: 1}
+}
+
+@keyframes animatetop {
+    from {top: -300px; opacity: 0}
+    to {top: 0; opacity: 1}
+}

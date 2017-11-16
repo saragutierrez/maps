@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mapa</title>
+    <script src="lodash.js"></script>
+    <script src="dados.js"></script>
+    <link href="arquivo.css" rel="stylesheet">
+    <style>
+        #map {
+            height: 80vw;
+        }
+    </style>
+</head>
+<body>
+<h3>My Google Maps Demo</h3>
+<div id="map"></div>
+
+<script>
+    //esse função depois ira retornar as estrutura do servidor, o corpo da função vai mudar para realizar tres consultas nesta hr.
+    function fetchDatasFromSomePlace() {
+        return ola.pdvs;
+        _(ola.jus).each(function (jus) {
+            //na hora retornamos um real, por hora só para ter;
+            jus.tipoJustificativa='JUSTIFICATIVA';
+        });
+        //normalização de algumas informações
+        _(ola.pdvs).each(function (pdv) {
+            pdv.rotas = JSON.parse(pdv.rotas)
+
+            pdv.rotas = _(pdv.rotas)
+                .map(function (rota) {
+                    var rt = {"codigousuario": rota[1], "data": rota[3]};
+                    Object.defineProperty(rt, 'usuario', {
+                        get: function () {
+                            return _(ola.usrs).find({codigousuario: rt.codigousuario}).nome;
+                        },
+                        enumerable: false,
+                        configurable: false
+                    });
+                    rt.juss=_(ola.jus).filter({
+                                codigousuario: rt.codigousuario,
+                                codigopdv: pdv.codigopdv
+                            }).value();
+                    // Object.defineProperty(rt, 'juss', {
+                    //     get: function () {
+                    //         return _(ola.jus).filter({
+                    //             codigousuario: rt.codigousuario,
+                    //             codigopdv: pdv.codigopdv
+                    //         }).value();
+                    //     },
+                    //     enumerable: false,
+                    //     configurable: false
+                    // });
+                    return rt;
+                })
+                .filter(function (rota) {
+                    return rota.juss && rota.juss.length
+                })
+                .value();
+        });
+
+        // ola.pdvs=_(ola.pdvs).filter(function(pdv){return pdv.rotas.length});
+        return ola;
+    }
+//iniciar mapa
+    function initMap() {
+        var map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 4,
+            center: {lat: -25, lng: 131}
+        });
+        //todo ajustar erros de quando os pdvs estão no mesmo lugar
+        addPdvsToMap(map, fetchDatasFromSomePlace());
+
+
+    }
+</script>
+
+<script>
+
+    var _MMapPP={};
+    function checkIfHasPinMap(lat,long){
+        lat=lat.toFixed(7);
+        long=long.toFixed(7)
+        if(!_MMapPP[lat+":"+long]){
+            _MMapPP[lat+":"+long]={count:1,marker:null};
+        }else{
+_MMapPP[lat+":"+long].count++;
+        }
+        return _MMapPP[lat+":"+long];
+    }
+    function getFiltros(){
+      return [];
+    }
+    //adiciona os markers e
+    function addPdvsToMap(map, data) {
+        var markers = [];
+//        apenas uma info windows, assim não tem risco de abrir mais de uma
+
+        var bounds = new google.maps.LatLngBounds();
+
+        _(data).each(
+            function (pdv) {
+//                pdvs sem lat-log não são adicionados
+                if (pdv.longitude) {
+                    var qtd=checkIfHasPinMap(+pdv.latitude, +pdv.longitude);
+                    if(qtd.count==1){
+                        qtd.marker = new google.maps.Marker({
+                            position: {lat: +pdv.latitude, lng: +pdv.longitude},
+                            map: map,
+                            pdvs:[pdv],
+                            title: pdv.nome
+                        });
+                        qtd.marker.addListener('click', function () {
+                          //Aprender a fazer fetch com jquery e enviar via post o retorno de getFiltros()
+                          $.ajax({
+                            url: "ajax.php",
+                            data: getFiltros()
+                          }).done(function(data) {
+                            console.log(data);
+                          });
+                            console.log(this,self,qtd,qtd.marker.pdvs);
+                            $('#modalMapa')
+                            .modal()
+                            .find('.modal-body')
+                            .html(
+                            _(qtd.marker.pdvs)
+                            .map(
+                                function(pdv){
+                                    if(qtd.count==1){
+                                    return mainInfoWindow(pdv);
+                                    }
+                                    // TODO colocar func para controlar quando qtd.count>1
+                                    return pdv.nome+mainInfoWindow(pdv);
+
+                            }
+                            ).value()
+                            .join('')
+                            );
+
+
+                            $('#modalMapa').modal().find('.modal-title').html(qtd.marker.pdvs.length==1?pdv.nome:"PDVs");
+                            // infowindow.setContent(mainInfoWindow(pdv));
+                            // infowindow.open(map, marker);
+                        });
+                        markers.push(qtd.marker);
+                        bounds.extend(qtd.marker.getPosition());
+                    }else{
+                        qtd.marker.setIcon(
+                            // TODO trocar icone por um iconezinho
+                            //'https://maps.google.com/mapfiles/kml/shapes/'+'parking_lot_maps.png',
+                            'imagem/marker2.png',
+
+                            );
+                        qtd.marker.title="PDVs";
+                        qtd.marker.pdvs.push(pdv);
+                    }
+//                    ao clicar sobre um marker executa este bloco
+
+
+                }
+            }
+        );
+//        cria os cluster para melhor visualizar grupos de pdvs
+        var markerCluster = new MarkerClusterer(map, markers,
+            {maxZoom:13 ,imagePath: 'javascripts/mapscluster/images/m'});
+
+        map.fitBounds(bounds);
+    }
+
+//monta a info window
+    function mainInfoWindow(pdv) {
+        var r = '<div style="width: 400px"><div class="panel-group" id="accordion">';
+        _(pdv.rotas).groupBy('codigousuario').each(function (rotas, i) {
+            if (!rotas.length) {
+                return;
+            }
+
+            r += panelInfoWindow(rotas,rotas[0].usuario, i);
+
+        });
+        return r += '</div></div>';
+    }
+    //monta a panel do usuario
+    function panelInfoWindow(rotas,usuario, id) {
+        var r = '<div class="panel panel-default"><div class="panel-heading"><h4 class="panel-title"><a data-toggle="collapse" class="collapsed" data-parent="#accordion" href="#collapse' + id + '">' +usuario + '</a></h4></div><div id="collapse' + id + '" class="panel-collapse collapse">';
+        //monta a panel das justificativas do usuario
+        _(rotas).each(function (rota,id2) {
+            //o id fica sendo pelo index do usuario e o index da rota nos array
+            //todo trocar forma que as datas são exibidas
+            r += '<div class="panel panel-default"><div class="panel-heading"><h4 class="panel-title"><a data-toggle="collapse" class="collapsed" data-parent="#collapse' + id + '" href="#collapse-rota'+id+'-' + id2 + '">' +rota.data + '</a></h4></div><div id="collapse-rota' +id+'-' + id2 + '" class="panel-collapse collapse">';
+            _(rota.juss).each(function(jus){
+                r += jusInfoWindow(jus);
+            });
+            r += '</div></div>';
+        });
+        return r += '</div></div>';
+    }
+    //info da justificativa
+    function jusInfoWindow(jus) {
+        return '<div class="panel-body">' +jus.tipoJustificativa+' - '+ jus.justificativa + '</div>';
+    }
+</script>
+
+<div class="modal fade" id="modalMapa">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">×</span>
+        </button>
+        <h5 class="modal-title">Modal title</h5>
+      </div>
+      <div class="modal-body">
+        <p>Modal body text goes here.</p>
+      </div>
+      <div class="modal-footer">
+
+      </div>
+    </div>
+  </div>
+</div>
+  <script src="javascripts/mapscluster/markerclusterer.js">
+</script>
+<script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDdlskrbiptCjh90Ejdhlq-NjDBipCGUzs&callback=initMap">
+</script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</body>
+</html>
